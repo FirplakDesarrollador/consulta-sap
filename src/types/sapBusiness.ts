@@ -60,15 +60,76 @@ export interface BusinessPartner {
   cardCode: string;
   cardName: string;
   cardType: 'Cliente' | 'Proveedor' | 'Lead';
+  rawCardType?: string;
   taxId: string;
   phone: string;
+  phone1?: string;
+  phone2?: string;
+  cellular?: string;
+  fax?: string;
   email: string;
+  website?: string;
   city: string;
   address: string;
   balance: number;
   currency: string;
+  groupCode?: number;
   groupName: string;
   status: 'Activo' | 'Inactivo';
+  contactPerson?: string;
+  notes?: string;
+  aliasName?: string;
+  industry?: string;
+  projectCode?: string;
+  territory?: string;
+  languageCode?: number;
+  globalLocationNumber?: string;
+  additionalId?: string;
+  unifiedFederalTaxId?: string;
+  blockMarketing?: boolean;
+}
+
+export interface BusinessPartnerDetail extends BusinessPartner {
+  foreignName?: string;
+  shippingType?: string;
+  channelPartnerCode?: string;
+  openOrdersBalance?: number;
+  openOpportunities?: number;
+  createDate?: string;
+  addresses?: {
+    addressName: string;
+    street: string;
+    block?: string;
+    city: string;
+    state?: string;
+    country?: string;
+    addressType: 'Facturación' | 'Envío' | string;
+    taxId?: string;
+  }[];
+  contacts?: {
+    id?: number;
+    name: string;
+    firstName?: string;
+    lastName?: string;
+    position?: string;
+    address?: string;
+    phone?: string;
+    cellPhone?: string;
+    email?: string;
+  }[];
+  paymentMethods?: {
+    code: string;
+  }[];
+  hbtLocalization?: {
+    tipDoc?: string;
+    nombres?: string;
+    apellido1?: string;
+    apellido2?: string;
+    regTrib?: string;
+    munMed?: string;
+    aplicaFel?: string;
+  };
+  raw?: any;
 }
 
 // --- Maestro del Articulo ---

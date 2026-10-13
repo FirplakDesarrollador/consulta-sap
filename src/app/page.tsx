@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { SidebarNav } from '@/components/layout/SidebarNav';
 import { VentasView } from '@/components/views/VentasView';
+import { SociosView } from '@/components/views/SociosView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
-import { SubModuleId, DocumentRow } from '@/types/sapBusiness';
+import { SubModuleId, DocumentRow, BusinessPartner } from '@/types/sapBusiness';
 
 export default function Home() {
   const [currentSubModule, setCurrentSubModule] = useState<SubModuleId>('ventas_facturas');
@@ -20,11 +21,22 @@ export default function Home() {
   const [serverLimit, setServerLimit] = useState(50);
   const [serverHasMore, setServerHasMore] = useState(false);
 
-  // Filter criteria for server queries
+  // Filter criteria for server queries (Facturas)
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [serverSearchQuery, setServerSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Server-side state for Socios de Negocios
+  const [socios, setSocios] = useState<BusinessPartner[]>([]);
+  const [isLoadingSocios, setIsLoadingSocios] = useState(false);
+  const [sociosError, setSociosError] = useState<string | null>(null);
+  const [sociosPage, setSociosPage] = useState(1);
+  const [sociosLimit, setSociosLimit] = useState(50);
+  const [sociosHasMore, setSociosHasMore] = useState(false);
+  const [sociosSearchQuery, setSociosSearchQuery] = useState('');
+  const [sociosTypeFilter, setSociosTypeFilter] = useState('ALL');
+  const [sociosStatusFilter, setSociosStatusFilter] = useState('ALL');
 
   // Fetch real SAP Invoices from server with filters and pagination
   const fetchRealInvoices = useCallback(async (
@@ -62,16 +74,69 @@ export default function Home() {
     }
   }, [serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter]);
 
+  // Fetch real SAP Business Partners from server with filters and pagination
+  const fetchRealSocios = useCallback(async (
+    page = sociosPage,
+    limit = sociosLimit,
+    search = sociosSearchQuery,
+    type = sociosTypeFilter,
+    status = sociosStatusFilter
+  ) => {
+    setIsLoadingSocios(true);
+    setSociosError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit)
+      });
+      if (search) params.set('search', search);
+      if (type && type !== 'ALL') params.set('type', type);
+      if (status && status !== 'ALL') params.set('status', status);
+
+      const res = await fetch(`/api/sap/business-partners?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setSocios(json.data);
+        setSociosHasMore(Boolean(json.hasMore));
+      } else {
+        setSociosError(json.error || 'Error al conectar con SAP Service Layer');
+      }
+    } catch (err: any) {
+      setSociosError(err.message || 'Error al obtener socios de negocio de SAP');
+    } finally {
+      setIsLoadingSocios(false);
+    }
+  }, [sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter]);
+
   useEffect(() => {
     if (currentSubModule === 'ventas_facturas') {
       fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
+      fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
     }
-  }, [currentSubModule, serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter, fetchRealInvoices]);
+  }, [
+    currentSubModule,
+    serverPage,
+    serverLimit,
+    startDate,
+    endDate,
+    serverSearchQuery,
+    statusFilter,
+    fetchRealInvoices,
+    sociosPage,
+    sociosLimit,
+    sociosSearchQuery,
+    sociosTypeFilter,
+    sociosStatusFilter,
+    fetchRealSocios
+  ]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     if (currentSubModule === 'ventas_facturas') {
       await fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
+      await fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
     }
     setIsRefreshing(false);
   };
@@ -151,6 +216,37 @@ export default function Home() {
               onServerSearchSubmit={handleServerSearchSubmit}
               statusFilter={statusFilter}
               onStatusFilterChange={handleStatusFilterChange}
+            />
+          ) : currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes' ? (
+            <SociosView
+              socios={socios}
+              globalFilter={globalFilter}
+              isLoading={isLoadingSocios}
+              errorMessage={sociosError}
+              onRetry={() => fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter)}
+              serverPage={sociosPage}
+              serverLimit={sociosLimit}
+              serverHasMore={sociosHasMore}
+              onServerPageChange={setSociosPage}
+              onServerLimitChange={(limit) => {
+                setSociosLimit(limit);
+                setSociosPage(1);
+              }}
+              serverSearchQuery={sociosSearchQuery}
+              onServerSearchSubmit={(q) => {
+                setSociosSearchQuery(q);
+                setSociosPage(1);
+              }}
+              typeFilter={sociosTypeFilter}
+              onTypeFilterChange={(type) => {
+                setSociosTypeFilter(type);
+                setSociosPage(1);
+              }}
+              statusFilter={sociosStatusFilter}
+              onStatusFilterChange={(status) => {
+                setSociosStatusFilter(status);
+                setSociosPage(1);
+              }}
             />
           ) : (
             <UnderConstructionView
