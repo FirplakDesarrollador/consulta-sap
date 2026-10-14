@@ -136,3 +136,91 @@ export async function GET(
     timestamp: new Date().toISOString()
   });
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const decodedCardCode = decodeURIComponent(id).trim();
+
+    if (!decodedCardCode) {
+      return NextResponse.json(
+        { success: false, error: 'Código de socio no especificado' },
+        { status: 400 }
+      );
+    }
+
+    const body = await request.json();
+    const { contact, contacts } = body;
+
+    const list = Array.isArray(contacts) ? contacts : contact ? [contact] : [];
+
+    if (list.length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'No se enviaron datos de contacto para actualizar' },
+        { status: 400 }
+      );
+    }
+
+    // Format for SAP Service Layer ContactEmployees sub-collection
+    const sapContactEmployees = list.map((c: any) => {
+      const item: Record<string, any> = {};
+
+      // If id is provided, it's an existing contact update (InternalCode in OCPR)
+      if (c.id !== undefined && c.id !== null && c.id !== '') {
+        item.InternalCode = Number(c.id);
+      }
+
+      if (c.name !== undefined) item.Name = c.name;
+      if (c.firstName !== undefined) item.FirstName = c.firstName;
+      if (c.lastName !== undefined) item.LastName = c.lastName;
+      if (c.position !== undefined) item.Position = c.position;
+      if (c.phone !== undefined) item.Phone1 = c.phone;
+      if (c.cellPhone !== undefined) item.MobilePhone = c.cellPhone;
+      if (c.email !== undefined) item.E_Mail = c.email;
+      if (c.address !== undefined) item.Address = c.address;
+
+      return item;
+    });
+
+    const sanitized = decodedCardCode.replace(/'/g, "''");
+
+    // In SAP Service Layer, child collection updates are performed using PATCH on the parent BusinessPartners entity
+    const sapResult = await querySapServiceLayer(`BusinessPartners('${sanitized}')`, {
+      method: 'PATCH',
+      body: {
+        ContactEmployees: sapContactEmployees
+      }
+    });
+
+    if (!sapResult.success) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: sapResult.error || 'Error al actualizar contactos en SAP Service Layer'
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Contacto(s) actualizado(s) correctamente en SAP Business One'
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { success: false, error: err.message || 'Error interno del servidor al procesar la actualización' },
+      { status: 500 }
+    );
+  }
+}
+
+// Support PUT as an alias for PATCH so both methods can be used
+export async function PUT(
+  request: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  return PATCH(request, props);
+}

@@ -25,10 +25,13 @@ import {
   Layers,
   Landmark,
   ArrowUpRight,
-  BarChart3
+  BarChart3,
+  Pencil,
+  Plus
 } from 'lucide-react';
 import { BusinessPartnerDetail } from '@/types/sapBusiness';
 import { AccountBalanceModal } from './AccountBalanceModal';
+import { EditContactModal } from './EditContactModal';
 
 interface BusinessPartnerDetailModalProps {
   cardCode: string | null;
@@ -45,6 +48,37 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
   const [activeTab, setActiveTab] = useState<'general' | 'addresses' | 'contacts' | 'finance' | 'hbt' | 'raw'>('general');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
+  const [isEditContactModalOpen, setIsEditContactModalOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<any | null>(null);
+
+  const handleOpenEditContact = (contact: any) => {
+    setSelectedContact(contact);
+    setIsEditContactModalOpen(true);
+  };
+
+  const handleOpenCreateContact = () => {
+    setSelectedContact(null);
+    setIsEditContactModalOpen(true);
+  };
+
+  const handleContactSuccess = (savedContact: any, isNew: boolean) => {
+    if (!detail) return;
+    if (isNew) {
+      setDetail({
+        ...detail,
+        contacts: [...(detail.contacts || []), savedContact]
+      });
+    } else {
+      setDetail({
+        ...detail,
+        contacts: (detail.contacts || []).map((c) =>
+          (c.id && c.id === savedContact.id) || (c.name === savedContact.name && !c.id)
+            ? { ...c, ...savedContact }
+            : c
+        )
+      });
+    }
+  };
 
   useEffect(() => {
     if (!cardCode) return;
@@ -474,9 +508,24 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
               {/* TAB 3: CONTACTOS */}
               {activeTab === 'contacts' && (
                 <div className="space-y-4">
-                  <div className="text-xs text-slate-500 font-medium">
-                    Personas de contacto registradas en SAP Business One (ContactEmployees)
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+                    <div>
+                      <div className="text-xs text-slate-700 font-bold">
+                        Personas de contacto registradas en SAP Business One
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Subcolección ContactEmployees (OCPR). Sincronizado vía PATCH con SAP Service Layer.
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleOpenCreateContact}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-2xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Nuevo Contacto</span>
+                    </button>
                   </div>
+
                   {detail.contacts && detail.contacts.length > 0 ? (
                     <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
                       <table className="w-full text-left text-xs border-collapse">
@@ -487,17 +536,37 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
                             <th className="py-3 px-4">Teléfono</th>
                             <th className="py-3 px-4">Celular</th>
                             <th className="py-3 px-4">Correo Electrónico</th>
+                            <th className="py-3 px-4 text-right">Acción</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-slate-800">
                           {detail.contacts.map((c, idx) => (
-                            <tr key={idx} className="hover:bg-slate-50 transition">
-                              <td className="py-3 px-4 font-semibold text-slate-900">{c.name}</td>
+                            <tr key={c.id || idx} className="hover:bg-slate-50 transition group">
+                              <td className="py-3 px-4 font-semibold text-slate-900">
+                                <div className="flex items-center gap-2">
+                                  <span>{c.name}</span>
+                                  {c.id && (
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-500 font-mono font-normal rounded">
+                                      ID: {c.id}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                               <td className="py-3 px-4 text-slate-600">{c.position}</td>
                               <td className="py-3 px-4 font-mono text-slate-600">{c.phone || '—'}</td>
                               <td className="py-3 px-4 font-mono text-slate-600">{c.cellPhone || '—'}</td>
                               <td className="py-3 px-4 text-blue-600 hover:underline">
                                 {c.email ? <a href={`mailto:${c.email}`}>{c.email}</a> : '—'}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <button
+                                  onClick={() => handleOpenEditContact(c)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition shadow-2xs"
+                                  title={`Editar datos de ${c.name} en SAP`}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                  <span>Editar</span>
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -630,6 +699,17 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
             currency={detail.currency}
             currentBalance={detail.balance}
             onClose={() => setIsBalanceModalOpen(false)}
+          />
+        )}
+
+        {/* Edit Contact Modal */}
+        {isEditContactModalOpen && detail && (
+          <EditContactModal
+            cardCode={detail.cardCode}
+            contact={selectedContact}
+            isOpen={isEditContactModalOpen}
+            onClose={() => setIsEditContactModalOpen(false)}
+            onSuccess={handleContactSuccess}
           />
         )}
       </div>
