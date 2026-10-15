@@ -60,6 +60,11 @@ const moduleNames: Record<SubModuleId, { title: string; category: string; descri
     category: 'Inventarios',
     description: 'Informe de existencias y valoración de inventario.'
   },
+  inv_listas_precios: {
+    title: 'Listas de Precios (OPLN)',
+    category: 'Inventarios',
+    description: 'Gestión y consulta de listas de precios y condiciones comerciales en SAP Business One.'
+  },
   socios_maestro: {
     title: 'Socios de Negocios (OCRD)',
     category: 'Directorio Maestro',

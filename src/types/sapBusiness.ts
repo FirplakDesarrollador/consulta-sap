@@ -21,6 +21,7 @@ export type SubModuleId =
   | 'inv_salidas'
   | 'inv_traslados'
   | 'inv_auditoria'
+  | 'inv_listas_precios'
   // Socios & Articulos
   | 'socios_maestro'
   | 'articulos_maestro'
@@ -188,4 +189,30 @@ export interface HBTExpenseExpo {
 // --- Custom Query Result Record ---
 export interface QueryRecord {
   [key: string]: any;
+}
+
+// --- Listas de Precios (OPLN / ItemPrices) ---
+export interface SapPriceList {
+  priceListNo: number;
+  priceListName: string;
+  basePriceList: number;
+  factor: number;
+  isGrossPrice: boolean;
+  active: boolean;
+  currency: string;
+  validFrom?: string | null;
+  validTo?: string | null;
+}
+
+export interface ItemPriceRow {
+  itemCode: string;
+  itemName: string;
+  foreignName?: string;
+  groupCode?: number;
+  uom?: string;
+  priceListNo: number;
+  priceListName?: string;
+  price: number;
+  currency: string;
+  factor?: number;
 }

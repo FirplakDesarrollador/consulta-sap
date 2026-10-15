@@ -17,7 +17,8 @@ import {
   FileSpreadsheet,
   Layers,
   Sparkles,
-  Server
+  Server,
+  Tag
 } from 'lucide-react';
 import { ModuleCategory, SubModuleId } from '@/types/sapBusiness';
 
@@ -180,7 +181,8 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
                 { id: 'inv_entradas', label: 'Entradas', icon: ArrowDownToLine, color: 'text-emerald-600' },
                 { id: 'inv_salidas', label: 'Salidas', icon: ArrowUpFromLine, color: 'text-rose-600' },
                 { id: 'inv_traslados', label: 'Traslados', icon: ArrowRightLeft, color: 'text-blue-600' },
-                { id: 'inv_auditoria', label: 'Auditoría Stocks', icon: FileSpreadsheet, color: 'text-amber-600' }
+                { id: 'inv_auditoria', label: 'Auditoría Stocks', icon: FileSpreadsheet, color: 'text-amber-600' },
+                { id: 'inv_listas_precios', label: 'Lista de Precios', icon: Tag, color: 'text-purple-600' }
               ].map((item) => {
                 const isActive = currentSubModule === item.id;
                 const Icon = item.icon;

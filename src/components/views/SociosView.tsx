@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -68,6 +68,10 @@ export const SociosView: React.FC<SociosViewProps> = ({
 
   // Local state for search input before submitting
   const [tempSearch, setTempSearch] = useState(serverSearchQuery);
+
+  useEffect(() => {
+    setTempSearch(serverSearchQuery);
+  }, [serverSearchQuery]);
 
   const handleApplyFilters = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

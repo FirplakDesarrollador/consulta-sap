@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShoppingBag,
   Plus,
@@ -77,6 +77,10 @@ export const VentasView: React.FC<VentasViewProps> = ({
   const [tempStartDate, setTempStartDate] = useState(startDate);
   const [tempEndDate, setTempEndDate] = useState(endDate);
   const [tempSearch, setTempSearch] = useState(serverSearchQuery);
+
+  useEffect(() => {
+    setTempSearch(serverSearchQuery);
+  }, [serverSearchQuery]);
 
   const docTypeToCreate = subModule === 'ventas_facturas' ? 'Factura' : 'Pedido';
 

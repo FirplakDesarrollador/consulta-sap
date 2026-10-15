@@ -5,6 +5,7 @@ import { Header } from '@/components/layout/Header';
 import { SidebarNav } from '@/components/layout/SidebarNav';
 import { VentasView } from '@/components/views/VentasView';
 import { SociosView } from '@/components/views/SociosView';
+import { ListasPreciosView } from '@/components/views/ListasPreciosView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
 import { SubModuleId, DocumentRow, BusinessPartner } from '@/types/sapBusiness';
 
@@ -172,13 +173,24 @@ export default function Home() {
     }
   };
 
+  const handleGlobalFilterChange = (val: string) => {
+    setGlobalFilter(val);
+    if (currentSubModule === 'ventas_facturas') {
+      setServerSearchQuery(val);
+      setServerPage(1);
+    } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
+      setSociosSearchQuery(val);
+      setSociosPage(1);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-zinc-900 flex flex-col antialiased">
       {/* Top Header */}
       <Header
         currentSubModule={currentSubModule}
         globalFilter={globalFilter}
-        onGlobalFilterChange={setGlobalFilter}
+        onGlobalFilterChange={handleGlobalFilterChange}
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
       />
@@ -248,6 +260,8 @@ export default function Home() {
                 setSociosPage(1);
               }}
             />
+          ) : currentSubModule === 'inv_listas_precios' ? (
+            <ListasPreciosView globalFilter={globalFilter} />
           ) : (
             <UnderConstructionView
               subModule={currentSubModule}
