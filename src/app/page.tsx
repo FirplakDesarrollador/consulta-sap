@@ -8,12 +8,16 @@ import { PedidosView } from '@/components/views/PedidosView';
 import { SociosView } from '@/components/views/SociosView';
 import { ListasPreciosView } from '@/components/views/ListasPreciosView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
+import { ComprasDocumentsView } from '@/components/views/ComprasDocumentsView';
+import { LandedCostsView } from '@/components/views/LandedCostsView';
 import { SubModuleId, DocumentRow, BusinessPartner } from '@/types/sapBusiness';
 
 export default function Home() {
   const [currentSubModule, setCurrentSubModule] = useState<SubModuleId>('ventas_facturas');
   const [globalFilter, setGlobalFilter] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Compras: las vistas consultan SAP por su cuenta; este contador fuerza la recarga desde el Header
+  const [comprasRefreshKey, setComprasRefreshKey] = useState(0);
 
   // Server-side state for Facturas
   const [facturas, setFacturas] = useState<DocumentRow[]>([]);
@@ -198,6 +202,8 @@ export default function Home() {
       await fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter);
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       await fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
+    } else if (currentSubModule.startsWith('compras_')) {
+      setComprasRefreshKey((k) => k + 1);
     }
     setIsRefreshing(false);
   };
@@ -357,6 +363,12 @@ export default function Home() {
             />
           ) : currentSubModule === 'inv_listas_precios' ? (
             <ListasPreciosView globalFilter={globalFilter} />
+          ) : currentSubModule === 'compras_orden' ? (
+            <ComprasDocumentsView kind="purchase-orders" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'compras_entrada' ? (
+            <ComprasDocumentsView kind="goods-receipts" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'compras_precio_entrega' ? (
+            <LandedCostsView globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
           ) : (
             <UnderConstructionView
               subModule={currentSubModule}
