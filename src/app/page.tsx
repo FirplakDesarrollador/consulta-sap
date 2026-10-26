@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { SidebarNav } from '@/components/layout/SidebarNav';
 import { VentasView } from '@/components/views/VentasView';
+import { PedidosView } from '@/components/views/PedidosView';
 import { SociosView } from '@/components/views/SociosView';
 import { ListasPreciosView } from '@/components/views/ListasPreciosView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
@@ -27,6 +28,18 @@ export default function Home() {
   const [endDate, setEndDate] = useState('');
   const [serverSearchQuery, setServerSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Server-side state for Pedidos de Clientes (ORDR, solo lectura)
+  const [pedidos, setPedidos] = useState<DocumentRow[]>([]);
+  const [isLoadingPedidos, setIsLoadingPedidos] = useState(false);
+  const [pedidosError, setPedidosError] = useState<string | null>(null);
+  const [pedidosPage, setPedidosPage] = useState(1);
+  const [pedidosLimit, setPedidosLimit] = useState(50);
+  const [pedidosHasMore, setPedidosHasMore] = useState(false);
+  const [pedidosStartDate, setPedidosStartDate] = useState('');
+  const [pedidosEndDate, setPedidosEndDate] = useState('');
+  const [pedidosSearchQuery, setPedidosSearchQuery] = useState('');
+  const [pedidosStatusFilter, setPedidosStatusFilter] = useState('ALL');
 
   // Server-side state for Socios de Negocios
   const [socios, setSocios] = useState<BusinessPartner[]>([]);
@@ -75,6 +88,42 @@ export default function Home() {
     }
   }, [serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter]);
 
+  // Fetch real SAP Sales Orders (ORDR) from server with filters and pagination
+  const fetchRealOrders = useCallback(async (
+    page = pedidosPage,
+    limit = pedidosLimit,
+    start = pedidosStartDate,
+    end = pedidosEndDate,
+    search = pedidosSearchQuery,
+    status = pedidosStatusFilter
+  ) => {
+    setIsLoadingPedidos(true);
+    setPedidosError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit)
+      });
+      if (start) params.set('startDate', start);
+      if (end) params.set('endDate', end);
+      if (search) params.set('search', search);
+      if (status && status !== 'ALL') params.set('status', status);
+
+      const res = await fetch(`/api/sap/orders?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPedidos(json.data);
+        setPedidosHasMore(Boolean(json.hasMore));
+      } else {
+        setPedidosError(json.error || 'Error al conectar con SAP Service Layer');
+      }
+    } catch (err: unknown) {
+      setPedidosError(err instanceof Error ? err.message : 'Error al obtener pedidos de SAP');
+    } finally {
+      setIsLoadingPedidos(false);
+    }
+  }, [pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter]);
+
   // Fetch real SAP Business Partners from server with filters and pagination
   const fetchRealSocios = useCallback(async (
     page = sociosPage,
@@ -112,6 +161,8 @@ export default function Home() {
   useEffect(() => {
     if (currentSubModule === 'ventas_facturas') {
       fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter);
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
     }
@@ -124,6 +175,13 @@ export default function Home() {
     serverSearchQuery,
     statusFilter,
     fetchRealInvoices,
+    pedidosPage,
+    pedidosLimit,
+    pedidosStartDate,
+    pedidosEndDate,
+    pedidosSearchQuery,
+    pedidosStatusFilter,
+    fetchRealOrders,
     sociosPage,
     sociosLimit,
     sociosSearchQuery,
@@ -136,6 +194,8 @@ export default function Home() {
     setIsRefreshing(true);
     if (currentSubModule === 'ventas_facturas') {
       await fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      await fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter);
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       await fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
     }
@@ -178,6 +238,9 @@ export default function Home() {
     if (currentSubModule === 'ventas_facturas') {
       setServerSearchQuery(val);
       setServerPage(1);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      setPedidosSearchQuery(val);
+      setPedidosPage(1);
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       setSociosSearchQuery(val);
       setSociosPage(1);
@@ -228,6 +291,38 @@ export default function Home() {
               onServerSearchSubmit={handleServerSearchSubmit}
               statusFilter={statusFilter}
               onStatusFilterChange={handleStatusFilterChange}
+            />
+          ) : currentSubModule === 'ventas_pedidos' ? (
+            <PedidosView
+              pedidos={pedidos}
+              isLoading={isLoadingPedidos}
+              errorMessage={pedidosError}
+              onRetry={() => fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter)}
+              serverPage={pedidosPage}
+              serverLimit={pedidosLimit}
+              serverHasMore={pedidosHasMore}
+              onServerPageChange={setPedidosPage}
+              onServerLimitChange={(limit) => {
+                setPedidosLimit(limit);
+                setPedidosPage(1);
+              }}
+              startDate={pedidosStartDate}
+              endDate={pedidosEndDate}
+              onDateRangeChange={(start, end) => {
+                setPedidosStartDate(start);
+                setPedidosEndDate(end);
+                setPedidosPage(1);
+              }}
+              serverSearchQuery={pedidosSearchQuery}
+              onServerSearchSubmit={(q) => {
+                setPedidosSearchQuery(q);
+                setPedidosPage(1);
+              }}
+              statusFilter={pedidosStatusFilter}
+              onStatusFilterChange={(status) => {
+                setPedidosStatusFilter(status);
+                setPedidosPage(1);
+              }}
             />
           ) : currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes' ? (
             <SociosView
