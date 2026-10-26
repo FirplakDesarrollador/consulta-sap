@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: Ctx) {
   if (!(action in MAP)) return NextResponse.json({ success: false, error: `Acción desconocida: ${action}` }, { status: 404 });
 
   const slAction = MAP[action as keyof typeof MAP];
-  const plan = { method: 'POST' as const, path: `LandedCosts(${docId})/${slAction}`, description: `${slAction} ${docId}` };
+  const plan = { method: 'POST' as const, path: `LandedCosts(${docId})/${slAction}`, body: {}, description: `${slAction} ${docId}` };
   const blocked = guardWrite(request, plan);
   if (blocked) return blocked;
 
