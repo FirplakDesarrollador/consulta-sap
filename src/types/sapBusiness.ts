@@ -45,6 +45,8 @@ export interface DocumentRow {
   currency: string;
   status: 'Abierto' | 'Cerrado' | 'Cancelado' | 'Pendiente';
   comments?: string;
+  numAtCard?: string;
+  salesPersonCode?: number;
   itemsCount: number;
   items?: {
     itemCode: string;
