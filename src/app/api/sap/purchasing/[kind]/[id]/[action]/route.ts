@@ -15,7 +15,7 @@ import {
  *   action = save-draft-to-document (borrador)  → POST /DraftsService_SaveDraftToDocument
  *
  * Acciones enlazables verificadas en $metadata (FunctionImport IsBindable sobre SAPB1.Document).
- * Reopen solo aplica a Órdenes de Compra. Acepta ?dryRun=1; requiere SAP_ALLOW_WRITES=true.
+ * Reopen solo aplica a Órdenes de Compra. Las acciones enlazables se envían con cuerpo {}. Acepta ?dryRun=1; requiere SAP_ALLOW_WRITES=true.
  */
 
 type Ctx = { params: Promise<{ kind: string; id: string; action: string }> };
@@ -49,6 +49,8 @@ export async function POST(request: Request, { params }: Ctx) {
     plan = {
       method: 'POST',
       path: `${cfg.entity}(${docId})/${ACTION_MAP[a]}`,
+      // El SL exige un cuerpo JSON (aunque sea {}) en acciones enlazables; sin él responde -1116
+      body: {},
       description: `${ACTION_MAP[a]} ${cfg.label} ${docId}`
     };
   } else {
