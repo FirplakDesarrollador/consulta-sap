@@ -218,3 +218,121 @@ export interface ItemPriceRow {
   currency: string;
   factor?: number;
 }
+
+// --- Compras (OPOR / OPDN / OIPF) ---
+/** Tipo de documento de compra expuesto por /api/sap/purchasing/[kind] */
+export type PurchaseDocKind = 'purchase-orders' | 'goods-receipts';
+
+/** Origen de los datos: documento definitivo o borrador (ODRF) */
+export type PurchaseDocSource = 'documents' | 'drafts';
+
+export type PurchaseDocAction = 'cancel' | 'close' | 'reopen' | 'save-draft-to-document';
+
+export interface PurchaseDocLine {
+  lineNum: number;
+  itemCode: string;
+  description: string;
+  quantity: number;
+  openQuantity: number;
+  receivedQuantity: number;
+  price: number;
+  discountPercent: number;
+  lineTotal: number;
+  whsCode: string;
+  taxCode: string;
+  unitMsr: string;
+  lineStatus: 'Abierta' | 'Cerrada';
+  shipDate: string;
+  baseType: number | null;
+  baseEntry: number | null;
+  baseLine: number | null;
+}
+
+export interface PurchaseDocDetail {
+  kind: PurchaseDocKind;
+  source: PurchaseDocSource;
+  docEntry: number;
+  docNum: string;
+  cardCode: string;
+  cardName: string;
+  numAtCard: string;
+  taxId: string;
+  address: string;
+  docDate: string;
+  docDueDate: string;
+  taxDate: string;
+  currency: string;
+  docTotal: number;
+  vatSum: number;
+  subtotal: number;
+  discountPercent: number;
+  status: 'Abierto' | 'Cerrado' | 'Cancelado';
+  cancelled: boolean;
+  comments: string;
+  journalMemo: string;
+  buyerCode: number | null;
+  buyerName: string;
+  paymentGroup: number | string;
+  totalQuantity: number;
+  totalOpenQuantity: number;
+  openLinesCount: number;
+  lines: PurchaseDocLine[];
+  /** Operaciones que el Service Layer permite sobre este documento en su estado actual */
+  allowed: {
+    update: boolean;
+    updateLines: boolean;
+    cancel: boolean;
+    close: boolean;
+    reopen: boolean;
+    delete: boolean;
+    saveDraftToDocument: boolean;
+  };
+  raw: unknown;
+}
+
+/** Línea enviada por el formulario de creación / edición */
+export interface PurchaseLineInput {
+  lineNum?: number;
+  itemCode: string;
+  quantity: number;
+  price?: number;
+  warehouseCode?: string;
+  taxCode?: string;
+  discountPercent?: number;
+  baseEntry?: number;
+  baseLine?: number;
+}
+
+export interface PurchaseDocInput {
+  cardCode: string;
+  docDate?: string;
+  docDueDate?: string;
+  taxDate?: string;
+  numAtCard?: string;
+  comments?: string;
+  lines: PurchaseLineInput[];
+  /** Si es true se crea como borrador (POST /Drafts) en lugar del documento definitivo */
+  asDraft?: boolean;
+}
+
+export interface LandedCostRow {
+  id: string;
+  docEntry: number;
+  docNum: string;
+  postingDate: string;
+  dueDate: string;
+  vendorCode: string;
+  vendorName: string;
+  fileNumber: string;
+  reference: string;
+  remarks: string;
+  total: number;
+  currency: string;
+  status: 'Abierto' | 'Cerrado';
+}
+
+export interface LookupOption {
+  code: string;
+  name: string;
+  extra?: string;
+}
