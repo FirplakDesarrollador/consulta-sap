@@ -12,6 +12,7 @@ import { ComprasDocumentsView } from '@/components/views/ComprasDocumentsView';
 import { LandedCostsView } from '@/components/views/LandedCostsView';
 import { InventoryDocumentsView } from '@/components/inventarios/InventoryDocumentsView';
 import { StockAuditView } from '@/components/inventarios/StockAuditView';
+import { ItemMasterView } from '@/components/articulos/ItemMasterView';
 import { SubModuleId, DocumentRow, BusinessPartner } from '@/types/sapBusiness';
 
 export default function Home() {
@@ -22,6 +23,8 @@ export default function Home() {
   const [comprasRefreshKey, setComprasRefreshKey] = useState(0);
   // Inventarios (excepto Lista de Precios): mismo mecanismo de recarga desde el Header
   const [inventarioRefreshKey, setInventarioRefreshKey] = useState(0);
+  // Maestro del Artículo: recarga desde el Header
+  const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
 
   // Server-side state for Facturas
   const [facturas, setFacturas] = useState<DocumentRow[]>([]);
@@ -210,6 +213,8 @@ export default function Home() {
       setComprasRefreshKey((k) => k + 1);
     } else if (currentSubModule.startsWith('inv_') && currentSubModule !== 'inv_listas_precios') {
       setInventarioRefreshKey((k) => k + 1);
+    } else if (currentSubModule === 'articulos_maestro') {
+      setItemsRefreshKey((k) => k + 1);
     }
     setIsRefreshing(false);
   };
@@ -377,6 +382,8 @@ export default function Home() {
             <InventoryDocumentsView kinds={['transfers', 'transfer-requests']} globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
           ) : currentSubModule === 'inv_auditoria' ? (
             <StockAuditView globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
+          ) : currentSubModule === 'articulos_maestro' ? (
+            <ItemMasterView globalFilter={globalFilter} refreshKey={itemsRefreshKey} />
           ) : currentSubModule === 'compras_orden' ? (
             <ComprasDocumentsView kind="purchase-orders" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
           ) : currentSubModule === 'compras_entrada' ? (
