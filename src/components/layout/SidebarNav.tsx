@@ -266,7 +266,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <span className="font-bold text-[11px]">Localización HBT</span>
             </div>
             <span className="text-[9.5px] px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-bold">
-              Gastos Expo
+              Gestión
             </span>
           </button>
         </div>
