@@ -197,3 +197,50 @@ export async function querySapServiceLayer<T = any>(
     };
   }
 }
+
+/**
+ * GET binario (p. ej. `Attachments2(<id>)/$value`) contra el Service Layer. Solo lectura.
+ * Devuelve los bytes sin pasarlos por UTF-8 y corta si supera `maxBytes`.
+ */
+export async function fetchSapBinary(
+  endpoint: string,
+  maxBytes = 25 * 1024 * 1024
+): Promise<{ success: boolean; status?: number; contentType?: string; body?: Buffer; error?: string }> {
+  try {
+    const session = await getSapSession();
+    const { hostname, port, basePath } = parseUrl(SAP_BASE_URL);
+    const path = `${basePath}/${endpoint.replace(/^\//, '')}`;
+    const cookieHeader = session.cookies.map((c) => c.split(';')[0]).join('; ');
+    return await new Promise((resolve) => {
+      const req = https.request(
+        { hostname, port, path, method: 'GET', headers: { Cookie: cookieHeader, Accept: '*/*' }, agent, timeout: 45000 },
+        (res) => {
+          const chunks: Buffer[] = [];
+          let size = 0;
+          res.on('data', (c: Buffer) => {
+            size += c.length;
+            if (size > maxBytes) {
+              req.destroy();
+              resolve({ success: false, status: res.statusCode, error: 'El archivo supera el tamaño máximo permitido' });
+              return;
+            }
+            chunks.push(c);
+          });
+          res.on('end', () => {
+            const status = res.statusCode || 500;
+            if (status >= 400) resolve({ success: false, status, error: `SAP Service Layer HTTP ${status}` });
+            else resolve({ success: true, status, contentType: String(res.headers['content-type'] || ''), body: Buffer.concat(chunks) });
+          });
+        }
+      );
+      req.on('error', (e) => resolve({ success: false, error: e.message }));
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({ success: false, error: 'SAP Service Layer request timed out (45s)' });
+      });
+      req.end();
+    });
+  } catch (err) {
+    return { success: false, error: err instanceof Error && err.message ? err.message : 'Error de conexión con SAP Service Layer' };
+  }
+}
