@@ -3,6 +3,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { HbtFieldDef, HbtMode, HbtValue } from '@/types/hbt';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 
 export const hbtInputCls =
   'w-full px-3 py-1.5 text-xs border border-slate-300 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-60 disabled:cursor-not-allowed';
@@ -67,6 +68,11 @@ export function displayValue(def: HbtFieldDef | undefined, v: HbtValue | undefin
   const hit = def?.validValues.find((x) => x.value === s);
   return hit && hit.label !== s ? `${s} · ${hit.label}` : s;
 }
+
+/** Valor de campo como texto; las URLs http/https son enlaces (nueva pestaña) y se parten para no desbordar */
+export const ValueText: React.FC<{ def: HbtFieldDef | undefined; value: HbtValue | undefined; className?: string }> = ({ def, value, className }) => (
+  <LinkifiedText text={displayValue(def, value)} className={className} />
+);
 
 export function downloadCsv(filename: string, header: string[], rows: (string | number | null | undefined)[][]) {
   const esc = (v: string | number | null | undefined) => `"${String(v ?? '').replace(/"/g, '""')}"`;

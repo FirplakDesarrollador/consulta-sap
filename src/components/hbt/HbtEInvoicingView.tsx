@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Filter, RefreshCw, Download, Lock, X } from 'lucide-react';
+import { Search, Filter, RefreshCw, Download, Lock, X, FileText } from 'lucide-react';
 import { useSapQuery } from '@/lib/useSapQuery';
 import { money } from '@/lib/comprasApi';
 import { HbtDocType, HbtEInvoiceRow, HbtEInvoiceSummary, HbtFieldDef, HbtValue } from '@/types/hbt';
-import { displayValue, downloadCsv, ErrorBox, hbtCardCls, hbtInputCls, Pager } from './hbtUi';
+import { downloadCsv, ErrorBox, hbtCardCls, hbtInputCls, Pager, ValueText } from './hbtUi';
+import { DocumentPdfPreview } from '../common/DocumentPdfPreview';
 
 interface Props {
   refreshKey?: number;
@@ -46,6 +47,7 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
   const [selected, setSelected] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<'fields' | 'pdf'>('fields');
   const [reloadTick, setReloadTick] = useState(0);
 
   if (globalFilter !== prevGlobal) {
@@ -73,6 +75,11 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
 
   const detailQ = useSapQuery<DetailPayload>(selected !== null ? `/api/sap/hbt/einvoicing/${type}/${selected}` : null, []);
   const detailDefs = (detailQ.json?.fieldDefs as HbtFieldDef[] | undefined) ?? [];
+
+  const openDetail = (docEntry: number, tab: 'fields' | 'pdf') => {
+    setDetailTab(tab);
+    setSelected(docEntry);
+  };
 
   const apply = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -188,7 +195,7 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
         <table className="w-full text-xs">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
-              {['N.º', 'Fecha', 'Socio', 'Total', 'Estado FE', 'DIAN', 'Entrega', 'Enviado', 'Respuesta', 'Cód.'].map((h) => (
+              {['N.º', 'Fecha', 'Socio', 'Total', 'Estado FE', 'DIAN', 'Entrega', 'Enviado', 'Respuesta', 'Cód.', 'PDF'].map((h) => (
                 <th key={h} className="text-left font-bold px-3 py-2 whitespace-nowrap">
                   {h}
                 </th>
@@ -198,20 +205,20 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
           <tbody className="divide-y divide-slate-100">
             {listQ.isLoading && (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={11} className="px-3 py-6 text-center text-slate-500">
                   Consultando SAP…
                 </td>
               </tr>
             )}
             {!listQ.isLoading && rows.length === 0 && !listQ.error && (
               <tr>
-                <td colSpan={10} className="px-3 py-6 text-center text-slate-500">
+                <td colSpan={11} className="px-3 py-6 text-center text-slate-500">
                   Sin documentos para los filtros indicados
                 </td>
               </tr>
             )}
             {rows.map((r) => (
-              <tr key={r.docEntry} onClick={() => setSelected(r.docEntry)} className="hover:bg-indigo-50/50 cursor-pointer">
+              <tr key={r.docEntry} onClick={() => openDetail(r.docEntry, 'fields')} className="hover:bg-indigo-50/50 cursor-pointer">
                 <td className="px-3 py-2 font-mono font-semibold whitespace-nowrap">
                   {r.docNum}
                   {r.cancelled && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">anulado</span>}
@@ -227,6 +234,18 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
                 <td className="px-3 py-2 whitespace-nowrap">{r.sentDate || '—'}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{r.answerDate || '—'}</td>
                 <td className="px-3 py-2 font-mono whitespace-nowrap">{r.responseCode || '—'}</td>
+                <td className="px-3 py-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDetail(r.docEntry, 'pdf');
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-300 bg-white hover:bg-indigo-50 text-[11px] font-bold text-slate-700"
+                    title="Vista previa del PDF"
+                  >
+                    <FileText className="h-3 w-3" /> PDF
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -236,7 +255,7 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
 
       {selected !== null && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className={`w-full ${detailTab === 'pdf' ? 'max-w-5xl' : 'max-w-3xl'} max-h-[92vh] flex flex-col rounded-2xl bg-white border border-slate-200 shadow-2xl`} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-3 p-5 border-b border-slate-200">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-900">
@@ -248,7 +267,23 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="p-5 overflow-y-auto space-y-4">
+            <div className="flex gap-1 px-5 pt-2 border-b border-slate-200 text-xs font-bold">
+              {([['fields', 'Campos HBT'], ['pdf', 'PDF del documento']] as const).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setDetailTab(id)}
+                  className={`px-3 py-2 border-b-2 -mb-px ${detailTab === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {detailTab === 'pdf' && (
+              <div className="p-5 overflow-y-auto">
+                <DocumentPdfPreview key={`${type}-${selected}`} pdfBase={`/api/sap/hbt/einvoicing/${type}/${selected}/pdf`} />
+              </div>
+            )}
+            <div className={`p-5 overflow-y-auto space-y-4 ${detailTab === 'pdf' ? 'hidden' : ''}`}>
               {detailQ.isLoading && <p className="text-xs text-slate-500">Consultando SAP…</p>}
               <ErrorBox message={detailQ.error} />
               {detailQ.data && (
@@ -271,7 +306,7 @@ export const HbtEInvoicingView: React.FC<Props> = ({ refreshKey = 0, globalFilte
                           <div className="text-[10.5px] font-bold text-slate-500">
                             {d.label} <span className="font-mono font-medium text-slate-400">{d.name}</span>
                           </div>
-                          <div className="text-xs text-slate-800 break-words">{displayValue(d, detailQ.data!.fields[d.name])}</div>
+                          <div className="text-xs text-slate-800"><ValueText def={d} value={detailQ.data!.fields[d.name]} /></div>
                         </div>
                       ))}
                   </div>

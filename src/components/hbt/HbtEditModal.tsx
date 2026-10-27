@@ -8,6 +8,8 @@ import { WriteFeedback } from '../compras/WriteFeedback';
 import { HbtFieldDef, HbtValue } from '@/types/hbt';
 import { HbtFieldInput } from './HbtFieldInput';
 import { hbtInputCls } from './hbtUi';
+import { LinkifiedText } from '../common/LinkifiedText';
+import { safeHttpUrl } from '@/lib/linkify';
 
 export type HbtModalField = HbtFieldDef & { readOnly?: boolean };
 
@@ -198,6 +200,11 @@ export const HbtEditModal: React.FC<Props> = ({
                   disabled={!canWrite}
                   readOnlyReason={d.readOnly ? 'Solo lectura: lo mantiene el complemento HBT' : undefined}
                 />
+                {safeHttpUrl(values[d.name]) && (
+                  <div className="mt-1 text-[11px]">
+                    <LinkifiedText text={String(values[d.name])} />
+                  </div>
+                )}
               </div>
             ))}
             {defs.length === 0 && <p className="text-xs text-slate-500">Esta tabla no tiene campos de usuario además de Code y Name.</p>}

@@ -5,7 +5,7 @@ import { Search, Plus, RefreshCw, Download, Filter } from 'lucide-react';
 import { useSapQuery } from '@/lib/useSapQuery';
 import { HbtFieldDef, HbtRecord, HbtTableSchema } from '@/types/hbt';
 import { HbtEditModal } from './HbtEditModal';
-import { displayValue, downloadCsv, ErrorBox, hbtInputCls, MODE_BADGE, Pager, WritesBadge } from './hbtUi';
+import { displayValue, downloadCsv, ErrorBox, hbtInputCls, MODE_BADGE, Pager, ValueText, WritesBadge } from './hbtUi';
 
 interface Props {
   table: string;
@@ -209,7 +209,7 @@ export const HbtTableBrowser: React.FC<Props> = ({ table, refreshKey = 0, fixedP
                 <td className="px-3 py-2 text-slate-700">{r.name}</td>
                 {shown.map((d) => (
                   <td key={d.name} className="px-3 py-2 text-slate-700 max-w-[260px] truncate" title={displayValue(d, r.fields[d.name])}>
-                    {displayValue(d, r.fields[d.name])}
+                    <ValueText def={d} value={r.fields[d.name]} />
                   </td>
                 ))}
               </tr>
