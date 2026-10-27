@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 import { X, RefreshCw, AlertCircle, Ban, Lock, Trash2, FileCheck2, FlaskConical, Save, Pencil } from 'lucide-react';
 import { useSapQuery } from '@/lib/useSapQuery';
 import { InvDocDetail, InvDocKind, InvHeaderKey, InvLineInput } from '@/types/inventory';
@@ -406,7 +407,7 @@ function headerValue(doc: InvDocDetail, k: InvHeaderKey): string {
 const Info: React.FC<{ label: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
     <div className="text-[10px] font-bold uppercase text-slate-500">{label}</div>
-    <div className={`text-slate-900 font-semibold break-words ${mono ? 'font-mono' : ''}`}>{value || '—'}</div>
+    <div className={`text-slate-900 font-semibold break-words ${mono ? 'font-mono' : ''}`}>{value ? <LinkifiedText text={value} /> : '—'}</div>
   </div>
 );
 
