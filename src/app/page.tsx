@@ -7,6 +7,7 @@ import { VentasView } from '@/components/views/VentasView';
 import { PedidosView } from '@/components/views/PedidosView';
 import { SociosView } from '@/components/views/SociosView';
 import { ListasPreciosView } from '@/components/views/ListasPreciosView';
+import { HbtView } from '@/components/hbt/HbtView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
 import { ComprasDocumentsView } from '@/components/views/ComprasDocumentsView';
 import { LandedCostsView } from '@/components/views/LandedCostsView';
@@ -25,6 +26,7 @@ export default function Home() {
   const [inventarioRefreshKey, setInventarioRefreshKey] = useState(0);
   // Maestro del Artículo: recarga desde el Header
   const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
+  const [hbtRefreshKey, setHbtRefreshKey] = useState(0);
 
   // Server-side state for Facturas
   const [facturas, setFacturas] = useState<DocumentRow[]>([]);
@@ -215,6 +217,8 @@ export default function Home() {
       setInventarioRefreshKey((k) => k + 1);
     } else if (currentSubModule === 'articulos_maestro') {
       setItemsRefreshKey((k) => k + 1);
+    } else if (currentSubModule === 'hbt_gastos_expo') {
+      setHbtRefreshKey((k) => k + 1);
     }
     setIsRefreshing(false);
   };
@@ -390,6 +394,8 @@ export default function Home() {
             <ComprasDocumentsView kind="goods-receipts" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
           ) : currentSubModule === 'compras_precio_entrega' ? (
             <LandedCostsView globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'hbt_gastos_expo' ? (
+            <HbtView globalFilter={globalFilter} refreshKey={hbtRefreshKey} />
           ) : (
             <UnderConstructionView
               subModule={currentSubModule}
