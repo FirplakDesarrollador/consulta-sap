@@ -244,7 +244,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <span className="font-bold text-[11px]">Maestro del Artículo</span>
             </div>
             <span className="text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">
-              Consulta
+              Gestión
             </span>
           </button>
         </div>
