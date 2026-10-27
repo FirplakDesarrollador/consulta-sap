@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 import {
   X,
   ClipboardList,
@@ -441,7 +442,7 @@ export const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ orderId, onC
                       <span>Comentarios del Pedido</span>
                     </h4>
                     <p className="text-xs font-mono bg-slate-50 p-3 rounded-xl border border-slate-200 text-slate-800 leading-relaxed whitespace-pre-wrap">
-                      {detail.comments || 'Sin comentarios.'}
+                      {detail.comments ? <LinkifiedText text={detail.comments} /> : 'Sin comentarios.'}
                     </p>
                   </div>
                 </div>

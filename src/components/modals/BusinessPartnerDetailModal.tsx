@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 import {
   X,
   Building2,
@@ -461,7 +462,7 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
                       <span>Comentarios / Observaciones en SAP</span>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 min-h-[60px] whitespace-pre-wrap">
-                      {detail.notes ? detail.notes : <span className="text-slate-400 italic">Sin comentarios registrados en el socio de negocios.</span>}
+                      {detail.notes ? <LinkifiedText text={detail.notes} /> : <span className="text-slate-400 italic">Sin comentarios registrados en el socio de negocios.</span>}
                     </div>
                   </div>
                 </div>

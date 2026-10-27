@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { DocumentPdfPreview } from '@/components/common/DocumentPdfPreview';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 import {
   X,
   FileText,
@@ -15,6 +17,7 @@ import {
   AlertCircle,
   CheckCircle2,
   FileCode2,
+  FileText as FileTextIcon,
   User,
   MapPin,
   Percent,
@@ -33,7 +36,7 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
   const [detail, setDetail] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'lines' | 'header' | 'raw'>('lines');
+  const [activeTab, setActiveTab] = useState<'lines' | 'header' | 'pdf' | 'raw'>('lines');
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -127,6 +130,13 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                   <Download className="h-4 w-4" />
                 </button>
                 <button
+                  onClick={() => setActiveTab('pdf')}
+                  title="Ver el PDF de la factura"
+                  className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition shadow-2xs text-xs font-bold flex items-center gap-1.5"
+                >
+                  <FileTextIcon className="h-4 w-4" /> PDF
+                </button>
+                <button
                   onClick={() => window.print()}
                   title="Imprimir factura"
                   className="p-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition shadow-2xs"
@@ -167,6 +177,17 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
           >
             <Building2 className="h-4 w-4" />
             <span>Datos de Facturación & Cliente</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('pdf')}
+            className={`py-3 border-b-2 flex items-center gap-2 transition-colors ${
+              activeTab === 'pdf'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileTextIcon className="h-4 w-4" />
+            <span>Factura PDF</span>
           </button>
           <button
             onClick={() => setActiveTab('raw')}
@@ -374,12 +395,15 @@ export const InvoiceDetailModal: React.FC<InvoiceDetailModalProps> = ({
                         Comentarios / Documentos Base de Referencia
                       </h4>
                       <p className="text-xs font-mono bg-slate-50 p-3 rounded-xl border border-slate-200 text-slate-800 leading-relaxed">
-                        {detail.comments}
+                        <LinkifiedText text={detail.comments} />
                       </p>
                     </div>
                   )}
                 </div>
               )}
+
+              {/* TAB: PDF (representación gráfica de la factura electrónica) */}
+              {activeTab === 'pdf' && <DocumentPdfPreview key={detail.docEntry} pdfBase={`/api/sap/invoices/${detail.docEntry}/pdf`} />}
 
               {/* TAB 3: Raw JSON */}
               {activeTab === 'raw' && (

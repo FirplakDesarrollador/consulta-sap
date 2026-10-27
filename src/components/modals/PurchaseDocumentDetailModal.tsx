@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { LinkifiedText } from '@/components/common/LinkifiedText';
 import { useSapQuery } from '@/lib/useSapQuery';
 import {
   X,
@@ -546,7 +547,7 @@ export const PurchaseDocumentDetailModal: React.FC<Props> = ({ kind, label, docI
                   </div>
                   <div className="md:col-span-2 p-4 rounded-2xl bg-white border border-slate-200">
                     <h4 className="font-bold uppercase text-slate-500 mb-1.5">Comentarios</h4>
-                    <p className="font-mono bg-slate-50 p-3 rounded-xl border border-slate-200 whitespace-pre-wrap">{detail.comments || 'Sin comentarios.'}</p>
+                    <p className="font-mono bg-slate-50 p-3 rounded-xl border border-slate-200 whitespace-pre-wrap">{detail.comments ? <LinkifiedText text={detail.comments} /> : 'Sin comentarios.'}</p>
                   </div>
                 </div>
               )}
