@@ -13,6 +13,7 @@ export type SubModuleId =
   | 'ventas_pedidos'
   | 'ventas_clientes'
   // Compras
+  | 'compras_facturas'
   | 'compras_entrada'
   | 'compras_orden'
   | 'compras_precio_entrega'
@@ -36,7 +37,7 @@ export type SubModuleId =
 export interface DocumentRow {
   id: string;
   docNum: string;
-  docType: 'Factura' | 'Pedido' | 'Entrada Mercancía' | 'Orden de Compra' | 'Precio de Entrega';
+  docType: 'Factura' | 'Factura Proveedor' | 'Pedido' | 'Entrada Mercancía' | 'Orden de Compra' | 'Precio de Entrega';
   cardCode: string;
   cardName: string;
   docDate: string;
@@ -47,6 +48,7 @@ export interface DocumentRow {
   comments?: string;
   numAtCard?: string;
   salesPersonCode?: number;
+  vatSum?: number;
   itemsCount: number;
   items?: {
     itemCode: string;

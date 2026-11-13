@@ -124,6 +124,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           {openSections.compras && (
             <div className="mt-1 space-y-0.5 pl-3 border-l-2 border-slate-100 ml-4">
               {[
+                { id: 'compras_facturas', label: 'Facturas Proveedores', badge: 'SAP SL Real' },
                 { id: 'compras_entrada', label: 'Entrada Mercancía', badge: 'Cons. / Trans.' },
                 { id: 'compras_orden', label: 'Orden de Compra', badge: 'Cons. / Trans.' },
                 { id: 'compras_precio_entrega', label: 'Precio de Entrega', badge: 'Landed Costs' }

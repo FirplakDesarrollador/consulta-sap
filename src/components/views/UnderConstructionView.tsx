@@ -25,6 +25,11 @@ const moduleNames: Record<SubModuleId, { title: string; category: string; descri
     category: 'Ventas',
     description: 'Gestión de interlocutores comerciales y cartera.'
   },
+  compras_facturas: {
+    title: 'Facturas de Proveedores (OPCH)',
+    category: 'Compras',
+    description: 'Consulta y gestión de facturas de compras y cuentas por pagar en SAP Business One.'
+  },
   compras_entrada: {
     title: 'Entrada de Mercancías (OPDN)',
     category: 'Compras',
