@@ -124,6 +124,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
           {openSections.compras && (
             <div className="mt-1 space-y-0.5 pl-3 border-l-2 border-slate-100 ml-4">
               {[
+                { id: 'compras_facturas', label: 'Facturas Proveedores', badge: 'SAP SL Real' },
                 { id: 'compras_entrada', label: 'Entrada Mercancía', badge: 'Cons. / Trans.' },
                 { id: 'compras_orden', label: 'Orden de Compra', badge: 'Cons. / Trans.' },
                 { id: 'compras_precio_entrega', label: 'Precio de Entrega', badge: 'Landed Costs' }
@@ -244,7 +245,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <span className="font-bold text-[11px]">Maestro del Artículo</span>
             </div>
             <span className="text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 font-semibold">
-              Consulta
+              Gestión
             </span>
           </button>
         </div>
@@ -266,7 +267,7 @@ export const SidebarNav: React.FC<SidebarNavProps> = ({
               <span className="font-bold text-[11px]">Localización HBT</span>
             </div>
             <span className="text-[9.5px] px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-700 font-bold">
-              Gastos Expo
+              Gestión
             </span>
           </button>
         </div>

@@ -4,15 +4,30 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Header } from '@/components/layout/Header';
 import { SidebarNav } from '@/components/layout/SidebarNav';
 import { VentasView } from '@/components/views/VentasView';
+import { PedidosView } from '@/components/views/PedidosView';
+import { FacturasProveedoresView } from '@/components/views/FacturasProveedoresView';
 import { SociosView } from '@/components/views/SociosView';
 import { ListasPreciosView } from '@/components/views/ListasPreciosView';
+import { HbtView } from '@/components/hbt/HbtView';
 import { UnderConstructionView } from '@/components/views/UnderConstructionView';
+import { ComprasDocumentsView } from '@/components/views/ComprasDocumentsView';
+import { LandedCostsView } from '@/components/views/LandedCostsView';
+import { InventoryDocumentsView } from '@/components/inventarios/InventoryDocumentsView';
+import { StockAuditView } from '@/components/inventarios/StockAuditView';
+import { ItemMasterView } from '@/components/articulos/ItemMasterView';
 import { SubModuleId, DocumentRow, BusinessPartner } from '@/types/sapBusiness';
 
 export default function Home() {
   const [currentSubModule, setCurrentSubModule] = useState<SubModuleId>('ventas_facturas');
   const [globalFilter, setGlobalFilter] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Compras: las vistas consultan SAP por su cuenta; este contador fuerza la recarga desde el Header
+  const [comprasRefreshKey, setComprasRefreshKey] = useState(0);
+  // Inventarios (excepto Lista de Precios): mismo mecanismo de recarga desde el Header
+  const [inventarioRefreshKey, setInventarioRefreshKey] = useState(0);
+  // Maestro del Artículo: recarga desde el Header
+  const [itemsRefreshKey, setItemsRefreshKey] = useState(0);
+  const [hbtRefreshKey, setHbtRefreshKey] = useState(0);
 
   // Server-side state for Facturas
   const [facturas, setFacturas] = useState<DocumentRow[]>([]);
@@ -27,6 +42,30 @@ export default function Home() {
   const [endDate, setEndDate] = useState('');
   const [serverSearchQuery, setServerSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // Server-side state for Pedidos de Clientes (ORDR, solo lectura)
+  const [pedidos, setPedidos] = useState<DocumentRow[]>([]);
+  const [isLoadingPedidos, setIsLoadingPedidos] = useState(false);
+  const [pedidosError, setPedidosError] = useState<string | null>(null);
+  const [pedidosPage, setPedidosPage] = useState(1);
+  const [pedidosLimit, setPedidosLimit] = useState(50);
+  const [pedidosHasMore, setPedidosHasMore] = useState(false);
+  const [pedidosStartDate, setPedidosStartDate] = useState('');
+  const [pedidosEndDate, setPedidosEndDate] = useState('');
+  const [pedidosSearchQuery, setPedidosSearchQuery] = useState('');
+  const [pedidosStatusFilter, setPedidosStatusFilter] = useState('ALL');
+
+  // Server-side state for Facturas de Proveedores (Compras)
+  const [purchaseInvoices, setPurchaseInvoices] = useState<DocumentRow[]>([]);
+  const [isLoadingPurchaseInvoices, setIsLoadingPurchaseInvoices] = useState(false);
+  const [purchaseInvoicesError, setPurchaseInvoicesError] = useState<string | null>(null);
+  const [purchaseInvoicesPage, setPurchaseInvoicesPage] = useState(1);
+  const [purchaseInvoicesLimit, setPurchaseInvoicesLimit] = useState(50);
+  const [purchaseInvoicesHasMore, setPurchaseInvoicesHasMore] = useState(false);
+  const [purchaseInvoicesStartDate, setPurchaseInvoicesStartDate] = useState('');
+  const [purchaseInvoicesEndDate, setPurchaseInvoicesEndDate] = useState('');
+  const [purchaseInvoicesSearch, setPurchaseInvoicesSearch] = useState('');
+  const [purchaseInvoicesStatus, setPurchaseInvoicesStatus] = useState('ALL');
 
   // Server-side state for Socios de Negocios
   const [socios, setSocios] = useState<BusinessPartner[]>([]);
@@ -75,6 +114,42 @@ export default function Home() {
     }
   }, [serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter]);
 
+  // Fetch real SAP Sales Orders (ORDR) from server with filters and pagination
+  const fetchRealOrders = useCallback(async (
+    page = pedidosPage,
+    limit = pedidosLimit,
+    start = pedidosStartDate,
+    end = pedidosEndDate,
+    search = pedidosSearchQuery,
+    status = pedidosStatusFilter
+  ) => {
+    setIsLoadingPedidos(true);
+    setPedidosError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit)
+      });
+      if (start) params.set('startDate', start);
+      if (end) params.set('endDate', end);
+      if (search) params.set('search', search);
+      if (status && status !== 'ALL') params.set('status', status);
+
+      const res = await fetch(`/api/sap/orders?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPedidos(json.data);
+        setPedidosHasMore(Boolean(json.hasMore));
+      } else {
+        setPedidosError(json.error || 'Error al conectar con SAP Service Layer');
+      }
+    } catch (err: unknown) {
+      setPedidosError(err instanceof Error ? err.message : 'Error al obtener pedidos de SAP');
+    } finally {
+      setIsLoadingPedidos(false);
+    }
+  }, [pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter]);
+
   // Fetch real SAP Business Partners from server with filters and pagination
   const fetchRealSocios = useCallback(async (
     page = sociosPage,
@@ -109,9 +184,63 @@ export default function Home() {
     }
   }, [sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter]);
 
+  // Fetch real SAP Purchase Invoices (Facturas de Proveedores) from server with filters and pagination
+  const fetchRealPurchaseInvoices = useCallback(async (
+    page = purchaseInvoicesPage,
+    limit = purchaseInvoicesLimit,
+    start = purchaseInvoicesStartDate,
+    end = purchaseInvoicesEndDate,
+    search = purchaseInvoicesSearch,
+    status = purchaseInvoicesStatus
+  ) => {
+    setIsLoadingPurchaseInvoices(true);
+    setPurchaseInvoicesError(null);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit)
+      });
+      if (start) params.set('startDate', start);
+      if (end) params.set('endDate', end);
+      if (search) params.set('search', search);
+      if (status && status !== 'ALL') params.set('status', status);
+
+      const res = await fetch(`/api/sap/purchase-invoices?${params.toString()}`);
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        setPurchaseInvoices(json.data);
+        setPurchaseInvoicesHasMore(Boolean(json.hasMore));
+      } else {
+        setPurchaseInvoicesError(json.error || 'Error al conectar con SAP Service Layer');
+      }
+    } catch (err: any) {
+      setPurchaseInvoicesError(err.message || 'Error al obtener facturas de proveedores de SAP');
+    } finally {
+      setIsLoadingPurchaseInvoices(false);
+    }
+  }, [
+    purchaseInvoicesPage,
+    purchaseInvoicesLimit,
+    purchaseInvoicesStartDate,
+    purchaseInvoicesEndDate,
+    purchaseInvoicesSearch,
+    purchaseInvoicesStatus
+  ]);
+
   useEffect(() => {
     if (currentSubModule === 'ventas_facturas') {
       fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter);
+    } else if (currentSubModule === 'compras_facturas') {
+      fetchRealPurchaseInvoices(
+        purchaseInvoicesPage,
+        purchaseInvoicesLimit,
+        purchaseInvoicesStartDate,
+        purchaseInvoicesEndDate,
+        purchaseInvoicesSearch,
+        purchaseInvoicesStatus
+      );
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
     }
@@ -124,6 +253,20 @@ export default function Home() {
     serverSearchQuery,
     statusFilter,
     fetchRealInvoices,
+    pedidosPage,
+    pedidosLimit,
+    pedidosStartDate,
+    pedidosEndDate,
+    pedidosSearchQuery,
+    pedidosStatusFilter,
+    fetchRealOrders,
+    purchaseInvoicesPage,
+    purchaseInvoicesLimit,
+    purchaseInvoicesStartDate,
+    purchaseInvoicesEndDate,
+    purchaseInvoicesSearch,
+    purchaseInvoicesStatus,
+    fetchRealPurchaseInvoices,
     sociosPage,
     sociosLimit,
     sociosSearchQuery,
@@ -136,8 +279,27 @@ export default function Home() {
     setIsRefreshing(true);
     if (currentSubModule === 'ventas_facturas') {
       await fetchRealInvoices(serverPage, serverLimit, startDate, endDate, serverSearchQuery, statusFilter);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      await fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter);
+    } else if (currentSubModule === 'compras_facturas') {
+      await fetchRealPurchaseInvoices(
+        purchaseInvoicesPage,
+        purchaseInvoicesLimit,
+        purchaseInvoicesStartDate,
+        purchaseInvoicesEndDate,
+        purchaseInvoicesSearch,
+        purchaseInvoicesStatus
+      );
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       await fetchRealSocios(sociosPage, sociosLimit, sociosSearchQuery, sociosTypeFilter, sociosStatusFilter);
+    } else if (currentSubModule.startsWith('compras_')) {
+      setComprasRefreshKey((k) => k + 1);
+    } else if (currentSubModule.startsWith('inv_') && currentSubModule !== 'inv_listas_precios') {
+      setInventarioRefreshKey((k) => k + 1);
+    } else if (currentSubModule === 'articulos_maestro') {
+      setItemsRefreshKey((k) => k + 1);
+    } else if (currentSubModule === 'hbt_gastos_expo') {
+      setHbtRefreshKey((k) => k + 1);
     }
     setIsRefreshing(false);
   };
@@ -178,6 +340,12 @@ export default function Home() {
     if (currentSubModule === 'ventas_facturas') {
       setServerSearchQuery(val);
       setServerPage(1);
+    } else if (currentSubModule === 'ventas_pedidos') {
+      setPedidosSearchQuery(val);
+      setPedidosPage(1);
+    } else if (currentSubModule === 'compras_facturas') {
+      setPurchaseInvoicesSearch(val);
+      setPurchaseInvoicesPage(1);
     } else if (currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes') {
       setSociosSearchQuery(val);
       setSociosPage(1);
@@ -229,6 +397,90 @@ export default function Home() {
               statusFilter={statusFilter}
               onStatusFilterChange={handleStatusFilterChange}
             />
+          ) : currentSubModule === 'ventas_pedidos' ? (
+            <PedidosView
+              pedidos={pedidos}
+              isLoading={isLoadingPedidos}
+              errorMessage={pedidosError}
+              onRetry={() => fetchRealOrders(pedidosPage, pedidosLimit, pedidosStartDate, pedidosEndDate, pedidosSearchQuery, pedidosStatusFilter)}
+              serverPage={pedidosPage}
+              serverLimit={pedidosLimit}
+              serverHasMore={pedidosHasMore}
+              onServerPageChange={setPedidosPage}
+              onServerLimitChange={(limit) => {
+                setPedidosLimit(limit);
+                setPedidosPage(1);
+              }}
+              startDate={pedidosStartDate}
+              endDate={pedidosEndDate}
+              onDateRangeChange={(start, end) => {
+                setPedidosStartDate(start);
+                setPedidosEndDate(end);
+                setPedidosPage(1);
+              }}
+              serverSearchQuery={pedidosSearchQuery}
+              onServerSearchSubmit={(q) => {
+                setPedidosSearchQuery(q);
+                setPedidosPage(1);
+              }}
+              statusFilter={pedidosStatusFilter}
+              onStatusFilterChange={(status) => {
+                setPedidosStatusFilter(status);
+                setPedidosPage(1);
+              }}
+            />
+          ) : currentSubModule === 'compras_facturas' ? (
+            <FacturasProveedoresView
+              facturas={purchaseInvoices}
+              globalFilter={globalFilter}
+              isLoading={isLoadingPurchaseInvoices}
+              errorMessage={purchaseInvoicesError}
+              onRetry={() =>
+                fetchRealPurchaseInvoices(
+                  purchaseInvoicesPage,
+                  purchaseInvoicesLimit,
+                  purchaseInvoicesStartDate,
+                  purchaseInvoicesEndDate,
+                  purchaseInvoicesSearch,
+                  purchaseInvoicesStatus
+                )
+              }
+              serverPage={purchaseInvoicesPage}
+              serverLimit={purchaseInvoicesLimit}
+              serverHasMore={purchaseInvoicesHasMore}
+              onServerPageChange={setPurchaseInvoicesPage}
+              onServerLimitChange={(limit) => {
+                setPurchaseInvoicesLimit(limit);
+                setPurchaseInvoicesPage(1);
+              }}
+              startDate={purchaseInvoicesStartDate}
+              endDate={purchaseInvoicesEndDate}
+              onDateRangeChange={(start, end) => {
+                setPurchaseInvoicesStartDate(start);
+                setPurchaseInvoicesEndDate(end);
+                setPurchaseInvoicesPage(1);
+              }}
+              serverSearchQuery={purchaseInvoicesSearch}
+              onServerSearchSubmit={(q) => {
+                setPurchaseInvoicesSearch(q);
+                setPurchaseInvoicesPage(1);
+              }}
+              statusFilter={purchaseInvoicesStatus}
+              onStatusFilterChange={(s) => {
+                setPurchaseInvoicesStatus(s);
+                setPurchaseInvoicesPage(1);
+              }}
+              onRefresh={() =>
+                fetchRealPurchaseInvoices(
+                  purchaseInvoicesPage,
+                  purchaseInvoicesLimit,
+                  purchaseInvoicesStartDate,
+                  purchaseInvoicesEndDate,
+                  purchaseInvoicesSearch,
+                  purchaseInvoicesStatus
+                )
+              }
+            />
           ) : currentSubModule === 'socios_maestro' || currentSubModule === 'ventas_clientes' ? (
             <SociosView
               socios={socios}
@@ -262,6 +514,24 @@ export default function Home() {
             />
           ) : currentSubModule === 'inv_listas_precios' ? (
             <ListasPreciosView globalFilter={globalFilter} />
+          ) : currentSubModule === 'inv_entradas' ? (
+            <InventoryDocumentsView kinds={['goods-entries']} globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
+          ) : currentSubModule === 'inv_salidas' ? (
+            <InventoryDocumentsView kinds={['goods-exits']} globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
+          ) : currentSubModule === 'inv_traslados' ? (
+            <InventoryDocumentsView kinds={['transfers', 'transfer-requests']} globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
+          ) : currentSubModule === 'inv_auditoria' ? (
+            <StockAuditView globalFilter={globalFilter} refreshKey={inventarioRefreshKey} />
+          ) : currentSubModule === 'articulos_maestro' ? (
+            <ItemMasterView globalFilter={globalFilter} refreshKey={itemsRefreshKey} />
+          ) : currentSubModule === 'compras_orden' ? (
+            <ComprasDocumentsView kind="purchase-orders" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'compras_entrada' ? (
+            <ComprasDocumentsView kind="goods-receipts" globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'compras_precio_entrega' ? (
+            <LandedCostsView globalFilter={globalFilter} refreshKey={comprasRefreshKey} />
+          ) : currentSubModule === 'hbt_gastos_expo' ? (
+            <HbtView globalFilter={globalFilter} refreshKey={hbtRefreshKey} />
           ) : (
             <UnderConstructionView
               subModule={currentSubModule}
