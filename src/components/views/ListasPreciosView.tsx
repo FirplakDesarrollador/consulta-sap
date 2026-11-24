@@ -27,6 +27,7 @@ interface ListasPreciosViewProps {
 
 export const ListasPreciosView: React.FC<ListasPreciosViewProps> = ({ globalFilter = '' }) => {
   const [priceLists, setPriceLists] = useState<SapPriceList[]>([]);
+  const [listSearch, setListSearch] = useState('');
   const [selectedListNo, setSelectedListNo] = useState<number>(1);
   const [selectedList, setSelectedList] = useState<SapPriceList | null>(null);
 
@@ -140,6 +141,24 @@ export const ListasPreciosView: React.FC<ListasPreciosViewProps> = ({ globalFilt
 
   const countWithPrice = items.filter((i) => i.price > 0).length;
 
+  // Filtered price lists for quick navigation across 150+ lists
+  const filteredPriceLists = listSearch.trim()
+    ? priceLists.filter((pl) => {
+        const q = listSearch.trim().toLowerCase();
+        return (
+          String(pl.priceListNo).includes(q) ||
+          pl.priceListName.toLowerCase().includes(q) ||
+          pl.currency.toLowerCase().includes(q)
+        );
+      })
+    : priceLists;
+
+  // Ensure the currently selected list stays visible in the dropdown even when filtering
+  const dropdownPriceLists =
+    selectedList && !filteredPriceLists.some((pl) => pl.priceListNo === selectedList.priceListNo)
+      ? [selectedList, ...filteredPriceLists]
+      : filteredPriceLists;
+
   return (
     <div className="space-y-4">
       {/* Toast Alert */}
@@ -186,22 +205,51 @@ export const ListasPreciosView: React.FC<ListasPreciosViewProps> = ({ globalFilt
         {/* Price List Selector & Metadata Row */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
           {/* Price List Dropdown */}
-          <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Seleccionar Lista de Precios
-            </label>
+          <div className="md:col-span-2 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Seleccionar Lista de Precios
+              </label>
+              {priceLists.length > 20 && (
+                <div className="relative w-48">
+                  <input
+                    type="text"
+                    value={listSearch}
+                    onChange={(e) => setListSearch(e.target.value)}
+                    placeholder={`Filtrar ${priceLists.length} listas...`}
+                    className="w-full text-[11px] px-2.5 py-1 pl-7 pr-6 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400"
+                  />
+                  <Search className="h-3 w-3 text-slate-400 absolute left-2 top-1.5" />
+                  {listSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setListSearch('')}
+                      title="Limpiar filtro de listas"
+                      className="absolute right-1.5 top-0.5 text-slate-400 hover:text-slate-600 font-bold px-1"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <select
               value={selectedListNo}
               onChange={(e) => handlePriceListChange(Number(e.target.value))}
               disabled={isLoading && priceLists.length === 0}
               className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 shadow-2xs"
             >
-              {priceLists.map((pl) => (
+              {dropdownPriceLists.map((pl) => (
                 <option key={pl.priceListNo} value={pl.priceListNo}>
                   #{pl.priceListNo} - {pl.priceListName} ({pl.currency})
                 </option>
               ))}
             </select>
+            {listSearch.trim() && (
+              <p className="text-[10.5px] text-slate-500">
+                Mostrando {filteredPriceLists.length} de {priceLists.length} listas configuradas en SAP
+              </p>
+            )}
           </div>
 
           {/* Currency & Tax */}

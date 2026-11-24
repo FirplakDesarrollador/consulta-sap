@@ -187,8 +187,8 @@ export async function querySapServiceLayer<T = any>(
     return {
       success: true,
       data: json.value !== undefined ? json.value : json,
-      total: json['odata.count'] || (Array.isArray(json.value) ? json.value.length : 1),
-      nextLink: json['odata.nextLink']
+      total: json['odata.count'] || json['@odata.count'] || (Array.isArray(json.value) ? json.value.length : 1),
+      nextLink: json['odata.nextLink'] || json['@odata.nextLink']
     };
   } catch (err: any) {
     return {
@@ -199,48 +199,83 @@ export async function querySapServiceLayer<T = any>(
 }
 
 /**
- * GET binario (p. ej. `Attachments2(<id>)/$value`) contra el Service Layer. Solo lectura.
- * Devuelve los bytes sin pasarlos por UTF-8 y corta si supera `maxBytes`.
+ * Normalize SAP Service Layer odata.nextLink to a relative endpoint under basePath
  */
-export async function fetchSapBinary(
-  endpoint: string,
-  maxBytes = 25 * 1024 * 1024
-): Promise<{ success: boolean; status?: number; contentType?: string; body?: Buffer; error?: string }> {
-  try {
-    const session = await getSapSession();
-    const { hostname, port, basePath } = parseUrl(SAP_BASE_URL);
-    const path = `${basePath}/${endpoint.replace(/^\//, '')}`;
-    const cookieHeader = session.cookies.map((c) => c.split(';')[0]).join('; ');
-    return await new Promise((resolve) => {
-      const req = https.request(
-        { hostname, port, path, method: 'GET', headers: { Cookie: cookieHeader, Accept: '*/*' }, agent, timeout: 45000 },
-        (res) => {
-          const chunks: Buffer[] = [];
-          let size = 0;
-          res.on('data', (c: Buffer) => {
-            size += c.length;
-            if (size > maxBytes) {
-              req.destroy();
-              resolve({ success: false, status: res.statusCode, error: 'El archivo supera el tamaño máximo permitido' });
-              return;
-            }
-            chunks.push(c);
-          });
-          res.on('end', () => {
-            const status = res.statusCode || 500;
-            if (status >= 400) resolve({ success: false, status, error: `SAP Service Layer HTTP ${status}` });
-            else resolve({ success: true, status, contentType: String(res.headers['content-type'] || ''), body: Buffer.concat(chunks) });
-          });
-        }
-      );
-      req.on('error', (e) => resolve({ success: false, error: e.message }));
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({ success: false, error: 'SAP Service Layer request timed out (45s)' });
-      });
-      req.end();
-    });
-  } catch (err) {
-    return { success: false, error: err instanceof Error && err.message ? err.message : 'Error de conexión con SAP Service Layer' };
+function normalizeNextLink(nextLink: string, basePath: string): string {
+  let clean = nextLink.trim();
+  if (/^https?:\/\//i.test(clean)) {
+    const parsed = new URL(clean);
+    clean = `${parsed.pathname}${parsed.search}`;
   }
+  const normalizedBase = basePath.replace(/^\/|\/$/g, '');
+  clean = clean.replace(/^\/+/, '');
+  if (normalizedBase && clean.startsWith(`${normalizedBase}/`)) {
+    clean = clean.slice(normalizedBase.length + 1);
+  }
+  return clean;
+}
+
+/**
+ * Fetch ALL pages of a SAP Service Layer collection by following odata.nextLink
+ */
+export async function queryAllSapServiceLayer<T = any>(
+  endpoint: string,
+  options?: {
+    params?: Record<string, string>;
+    pageSize?: number;
+    maxPages?: number;
+  }
+): Promise<{ success: boolean; data?: T[]; total?: number; error?: string }> {
+  const pageSize = options?.pageSize || 200;
+  const maxPages = options?.maxPages || 50;
+  const { basePath } = parseUrl(SAP_BASE_URL);
+
+  const allItems: T[] = [];
+  let currentEndpoint = endpoint;
+  let currentParams = options?.params;
+  let pagesFetched = 0;
+
+  while (pagesFetched < maxPages) {
+    const res = await querySapServiceLayer<T[]>(currentEndpoint, {
+      params: currentParams,
+      pageSize
+    });
+
+    if (!res.success) {
+      if (pagesFetched === 0) {
+        return { success: false, error: res.error };
+      }
+      return {
+        success: false,
+        data: allItems,
+        total: allItems.length,
+        error: res.error
+      };
+    }
+
+    if (Array.isArray(res.data)) {
+      allItems.push(...res.data);
+    }
+
+    pagesFetched += 1;
+
+    if (!res.nextLink) {
+      break;
+    }
+
+    const nextEndpoint = normalizeNextLink(res.nextLink, basePath);
+    if (!nextEndpoint || nextEndpoint === currentEndpoint) {
+      break;
+    }
+
+    currentEndpoint = nextEndpoint;
+    // nextLink already includes query parameters ($orderby, $select, $skip, etc.)
+    currentParams = undefined;
+  }
+
+  return {
+    success: true,
+    data: allItems,
+    total: allItems.length
+  };
 }
