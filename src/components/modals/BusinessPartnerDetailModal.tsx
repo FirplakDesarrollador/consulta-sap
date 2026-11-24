@@ -27,9 +27,15 @@ import {
   ArrowUpRight,
   BarChart3,
   Pencil,
-  Plus
+  Plus,
+  Tag,
+  Loader2,
+  CheckCircle2,
+  Search,
+  RotateCcw,
+  Save
 } from 'lucide-react';
-import { BusinessPartnerDetail } from '@/types/sapBusiness';
+import { BusinessPartnerDetail, SapPriceList } from '@/types/sapBusiness';
 import { AccountBalanceModal } from './AccountBalanceModal';
 import { EditContactModal } from './EditContactModal';
 
@@ -43,9 +49,15 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
   onClose
 }) => {
   const [detail, setDetail] = useState<BusinessPartnerDetail | null>(null);
+  const [priceLists, setPriceLists] = useState<SapPriceList[]>([]);
+  const [selectedPriceListNum, setSelectedPriceListNum] = useState<string>('');
+  const [priceListSearch, setPriceListSearch] = useState<string>('');
+  const [isSavingPriceList, setIsSavingPriceList] = useState(false);
+  const [priceListError, setPriceListError] = useState<string | null>(null);
+  const [priceListSuccess, setPriceListSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'addresses' | 'contacts' | 'finance' | 'hbt' | 'raw'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'addresses' | 'contacts' | 'paymentTerms' | 'finance' | 'hbt' | 'raw'>('general');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false);
   const [isEditContactModalOpen, setIsEditContactModalOpen] = useState(false);
@@ -86,12 +98,25 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
     const fetchDetail = async () => {
       setIsLoading(true);
       setError(null);
+      setPriceListError(null);
+      setPriceListSuccess(null);
+      setPriceListSearch('');
       try {
         const encoded = encodeURIComponent(cardCode);
         const res = await fetch(`/api/sap/business-partners/${encoded}`);
         const json = await res.json();
         if (json.success && json.data) {
           setDetail(json.data);
+          if (Array.isArray(json.priceLists)) {
+            setPriceLists(json.priceLists);
+          }
+          const initialPriceList =
+            json.data.paymentTerms?.priceListNum ?? json.data.raw?.PriceListNum;
+          setSelectedPriceListNum(
+            initialPriceList !== undefined && initialPriceList !== null
+              ? String(initialPriceList)
+              : ''
+          );
         } else {
           setError(json.error || 'No se pudo cargar la información del socio de negocios');
         }
@@ -104,6 +129,92 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
 
     fetchDetail();
   }, [cardCode]);
+
+  // Fallback load of price lists if the catalog wasn't included or returned empty
+  useEffect(() => {
+    if (activeTab !== 'paymentTerms' || priceLists.length > 0 || isLoading) return;
+    let cancelled = false;
+    fetch('/api/sap/price-lists?onlyLists=true')
+      .then((res) => res.json())
+      .then((json) => {
+        if (!cancelled && json.success && Array.isArray(json.priceLists)) {
+          setPriceLists(json.priceLists);
+        }
+      })
+      .catch(() => {
+        // Silently ignore; user still sees current list
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, priceLists.length, isLoading]);
+
+  const handleSavePriceList = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detail) return;
+    if (selectedPriceListNum === '') {
+      setPriceListError('Por favor seleccione una lista de precios.');
+      return;
+    }
+
+    const parsedListNum = Number(selectedPriceListNum);
+    if (!Number.isInteger(parsedListNum)) {
+      setPriceListError('El número de lista de precios seleccionado no es válido.');
+      return;
+    }
+
+    setIsSavingPriceList(true);
+    setPriceListError(null);
+    setPriceListSuccess(null);
+
+    try {
+      const encoded = encodeURIComponent(detail.cardCode);
+      const res = await fetch(`/api/sap/business-partners/${encoded}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceListNum: parsedListNum })
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'No se pudo actualizar la lista de precios en SAP');
+      }
+
+      const matched = priceLists.find((pl) => pl.priceListNo === parsedListNum);
+      const specialNames: Record<number, string> = {
+        [-1]: 'Último precio de compra',
+        [-2]: 'Último precio determinado'
+      };
+      const updatedName =
+        matched?.priceListName || specialNames[parsedListNum] || `Lista #${parsedListNum}`;
+
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              paymentTerms: {
+                payTermsGrpCode: prev.paymentTerms?.payTermsGrpCode ?? null,
+                payTermsGrpName: prev.paymentTerms?.payTermsGrpName || 'Sin condición asignada',
+                interestRatePercent: prev.paymentTerms?.interestRatePercent ?? 0,
+                priceListNum: parsedListNum,
+                priceListName: updatedName,
+                discountPercent: prev.paymentTerms?.discountPercent ?? 0,
+                creditLimit: prev.paymentTerms?.creditLimit ?? 0,
+                maxCommitment: prev.paymentTerms?.maxCommitment ?? 0
+              },
+              raw: prev.raw ? { ...prev.raw, PriceListNum: parsedListNum } : prev.raw
+            }
+          : prev
+      );
+      setPriceListSuccess(
+        json.message || `Lista de precios actualizada a #${parsedListNum} - ${updatedName} en SAP`
+      );
+    } catch (err: any) {
+      setPriceListError(err.message || 'Error al guardar la lista de precios en SAP');
+    } finally {
+      setIsSavingPriceList(false);
+    }
+  };
 
   if (!cardCode) return null;
 
@@ -219,6 +330,17 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
           >
             <Users className="h-4 w-4" />
             <span>Contactos ({detail?.contacts?.length || 0})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('paymentTerms')}
+            className={`py-3 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+              activeTab === 'paymentTerms'
+                ? 'border-amber-500 text-amber-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Tag className="h-4 w-4" />
+            <span>Condiciones de pago</span>
           </button>
           <button
             onClick={() => setActiveTab('finance')}
@@ -581,7 +703,297 @@ export const BusinessPartnerDetailModal: React.FC<BusinessPartnerDetailModalProp
                 </div>
               )}
 
-              {/* TAB 4: FINANZAS & PAGOS */}
+              {/* TAB 4: CONDICIONES DE PAGO (Mirrors SAP Business One Payment Terms Tab) */}
+              {activeTab === 'paymentTerms' && (() => {
+                const pt = detail.paymentTerms;
+                const currentPriceListNum = pt?.priceListNum ?? null;
+                const currentPriceListStr =
+                  currentPriceListNum !== null ? String(currentPriceListNum) : '';
+                const hasPriceListChanged =
+                  selectedPriceListNum !== '' && selectedPriceListNum !== currentPriceListStr;
+
+                const filteredLists = priceListSearch.trim()
+                  ? priceLists.filter((pl) => {
+                      const q = priceListSearch.trim().toLowerCase();
+                      return (
+                        String(pl.priceListNo).includes(q) ||
+                        pl.priceListName.toLowerCase().includes(q) ||
+                        pl.currency.toLowerCase().includes(q)
+                      );
+                    })
+                  : priceLists;
+
+                const selectedNumParsed =
+                  selectedPriceListNum !== '' ? Number(selectedPriceListNum) : null;
+                const selectedInFiltered =
+                  selectedNumParsed !== null &&
+                  filteredLists.some((pl) => pl.priceListNo === selectedNumParsed);
+                const selectedFromAll =
+                  selectedNumParsed !== null
+                    ? priceLists.find((pl) => pl.priceListNo === selectedNumParsed)
+                    : undefined;
+
+                const dropdownOptions: { value: number; label: string }[] = [];
+                if (selectedNumParsed !== null && !selectedInFiltered) {
+                  if (selectedFromAll) {
+                    dropdownOptions.push({
+                      value: selectedFromAll.priceListNo,
+                      label: `#${selectedFromAll.priceListNo} - ${selectedFromAll.priceListName} (${selectedFromAll.currency})`
+                    });
+                  } else {
+                    dropdownOptions.push({
+                      value: selectedNumParsed,
+                      label: `#${selectedNumParsed} - ${pt?.priceListName || `Lista #${selectedNumParsed}`}`
+                    });
+                  }
+                }
+                for (const pl of filteredLists) {
+                  dropdownOptions.push({
+                    value: pl.priceListNo,
+                    label: `#${pl.priceListNo} - ${pl.priceListName} (${pl.currency})`
+                  });
+                }
+
+                return (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+                      <div>
+                        <div className="text-xs text-slate-800 font-bold">
+                          Condiciones de pago y Lista de precios (OCRD - SAP)
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Parámetros comerciales del socio de negocio. Modifique la lista de precios asignada y guarde directamente en SAP.
+                        </div>
+                      </div>
+                      {priceLists.length > 0 && (
+                        <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          {priceLists.length} Listas disponibles en SAP
+                        </span>
+                      )}
+                    </div>
+
+                    {priceListError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-700 animate-fadeIn">
+                        <AlertCircle className="h-4 w-4 text-rose-500 shrink-0 mt-0.5" />
+                        <div className="flex-1 font-medium">{priceListError}</div>
+                      </div>
+                    )}
+
+                    {priceListSuccess && (
+                      <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-2.5 text-xs text-emerald-800 font-semibold animate-fadeIn">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                        <div>{priceListSuccess}</div>
+                      </div>
+                    )}
+
+                    <form onSubmit={handleSavePriceList} className="bg-white border border-slate-200 rounded-xl p-5 shadow-2xs space-y-5">
+                      {/* Row 1: Condiciones de pago & % intereses por retraso */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Condiciones de pago
+                          </label>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-extrabold text-slate-900">
+                              {pt?.payTermsGrpName || 'Sin condición asignada'}
+                            </span>
+                            {pt?.payTermsGrpCode !== null && pt?.payTermsGrpCode !== undefined && (
+                              <span className="text-[10.5px] px-2 py-0.5 rounded bg-slate-200/80 text-slate-700 font-mono font-bold">
+                                Cód. {pt.payTermsGrpCode}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            % intereses por retraso
+                          </label>
+                          <div className="text-xs font-mono font-bold text-slate-900">
+                            {(pt?.interestRatePercent ?? 0).toLocaleString('es-ES', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                            %
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Lista de precios (Editable - Highlighted like SAP) */}
+                      <div className="p-4 rounded-xl bg-amber-50/60 border-2 border-amber-300/80 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <Tag className="h-4 w-4 text-amber-700" />
+                            <label
+                              htmlFor="bp-price-list-select"
+                              className="text-xs font-extrabold text-amber-950 uppercase tracking-wider"
+                            >
+                              Lista de precios (Editable)
+                            </label>
+                            {hasPriceListChanged && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 font-bold">
+                                Cambio sin guardar
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-amber-900 font-medium">
+                            Actual en SAP:{' '}
+                            <strong className="font-mono font-bold">
+                              {currentPriceListNum !== null
+                                ? `#${currentPriceListNum} - ${pt?.priceListName}`
+                                : 'Sin lista asignada'}
+                            </strong>
+                          </div>
+                        </div>
+
+                        {/* Quick search filter for 150+ lists */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                          <div className="md:col-span-5 relative">
+                            <input
+                              type="text"
+                              value={priceListSearch}
+                              onChange={(e) => setPriceListSearch(e.target.value)}
+                              placeholder="Buscar lista por # o nombre (ej: 176, Jaguar)..."
+                              className="w-full text-xs px-3 py-2 pl-8 pr-7 rounded-xl border border-amber-300 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500"
+                            />
+                            <Search className="h-3.5 w-3.5 text-amber-600 absolute left-2.5 top-2.5" />
+                            {priceListSearch && (
+                              <button
+                                type="button"
+                                onClick={() => setPriceListSearch('')}
+                                title="Limpiar búsqueda"
+                                className="absolute right-2.5 top-1.5 text-slate-400 hover:text-slate-700 font-bold"
+                              >
+                                ×
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="md:col-span-7">
+                            <select
+                              id="bp-price-list-select"
+                              value={selectedPriceListNum}
+                              onChange={(e) => {
+                                setSelectedPriceListNum(e.target.value);
+                                setPriceListError(null);
+                                setPriceListSuccess(null);
+                              }}
+                              disabled={isSavingPriceList}
+                              className="w-full text-xs font-bold px-3 py-2 rounded-xl border border-amber-400 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-600 shadow-2xs"
+                            >
+                              {selectedPriceListNum === '' && (
+                                <option value="">— Seleccione una lista de precios —</option>
+                              )}
+                              {dropdownOptions.map((opt) => (
+                                <option key={opt.value} value={String(opt.value)}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                          <span className="text-[11px] text-amber-900/80">
+                            {priceListSearch.trim()
+                              ? `Mostrando ${filteredLists.length} de ${priceLists.length} listas de precios de SAP`
+                              : `Mostrando las ${priceLists.length} listas de precios configuradas en SAP (OPLN)`}
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            {hasPriceListChanged && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPriceListNum(currentPriceListStr);
+                                  setPriceListError(null);
+                                  setPriceListSuccess(null);
+                                }}
+                                disabled={isSavingPriceList}
+                                className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold transition flex items-center gap-1.5 disabled:opacity-50"
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                                <span>Restablecer</span>
+                              </button>
+                            )}
+                            <button
+                              type="submit"
+                              disabled={isSavingPriceList || !hasPriceListChanged}
+                              className="px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {isSavingPriceList ? (
+                                <>
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  <span>Guardando en SAP...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="h-3.5 w-3.5" />
+                                  <span>Guardar Lista en SAP</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 3: % descuento total, Límite de crédito, Límite de comprometido */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            % descuento total
+                          </label>
+                          <div className="text-sm font-mono font-extrabold text-slate-900">
+                            {(pt?.discountPercent ?? 0).toLocaleString('es-ES', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                            %
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Límite de crédito
+                          </label>
+                          <div className="text-sm font-mono font-extrabold text-slate-900">
+                            {detail.currency}{' '}
+                            {(pt?.creditLimit ?? 0).toLocaleString('es-ES', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-1">
+                          <label className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Límite de comprometido
+                          </label>
+                          <div className="text-sm font-mono font-extrabold text-slate-900">
+                            {detail.currency}{' '}
+                            {(pt?.maxCommitment ?? 0).toLocaleString('es-ES', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Service Layer sync note */}
+                      <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-[11px] text-slate-600 flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-medium">
+                          ⚡ Actualización en directo de <strong className="font-mono text-slate-800">PriceListNum</strong> en SAP Business One (Service Layer)
+                        </span>
+                        <span className="font-mono text-[10px] bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded font-bold">
+                          PATCH /b1s/v1/BusinessPartners(&apos;{detail.cardCode}&apos;)
+                        </span>
+                      </div>
+                    </form>
+                  </div>
+                );
+              })()}
+
+              {/* TAB 5: FINANZAS & PAGOS */}
               {activeTab === 'finance' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

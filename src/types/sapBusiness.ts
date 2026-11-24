@@ -121,6 +121,16 @@ export interface BusinessPartnerDetail extends BusinessPartner {
   paymentMethods?: {
     code: string;
   }[];
+  paymentTerms?: {
+    payTermsGrpCode: number | null;
+    payTermsGrpName: string;
+    interestRatePercent: number;
+    priceListNum: number | null;
+    priceListName: string;
+    discountPercent: number;
+    creditLimit: number;
+    maxCommitment: number;
+  };
   hbtLocalization?: {
     tipDoc?: string;
     nombres?: string;
@@ -192,6 +202,12 @@ export interface QueryRecord {
 }
 
 // --- Listas de Precios (OPLN / ItemPrices) ---
+export interface SapPaymentTerm {
+  groupNumber: number;
+  paymentTermsGroupName: string;
+  priceListNo?: number | null;
+}
+
 export interface SapPriceList {
   priceListNo: number;
   priceListName: string;

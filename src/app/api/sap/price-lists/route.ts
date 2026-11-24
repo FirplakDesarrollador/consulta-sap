@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { querySapServiceLayer } from '@/lib/sapClient';
+import { querySapServiceLayer, queryAllSapServiceLayer } from '@/lib/sapClient';
 
 export interface SapPriceList {
   priceListNo: number;
@@ -35,8 +35,9 @@ export async function GET(request: Request) {
     const limit = Math.max(10, Math.min(200, parseInt(searchParams.get('limit') || '50', 10)));
     const skip = (page - 1) * limit;
 
-    // 1. Fetch Price Lists catalog from SAP
-    const plRes = await querySapServiceLayer('PriceLists', {
+    // 1. Fetch ALL Price Lists catalog from SAP (following odata.nextLink pagination)
+    const plRes = await queryAllSapServiceLayer('PriceLists', {
+      pageSize: 200,
       params: {
         '$orderby': 'PriceListNo asc',
         '$select': 'PriceListNo,PriceListName,BasePriceList,Factor,IsGrossPrice,Active,DefaultPrimeCurrency,ValidFrom,ValidTo'

@@ -187,8 +187,8 @@ export async function querySapServiceLayer<T = any>(
     return {
       success: true,
       data: json.value !== undefined ? json.value : json,
-      total: json['odata.count'] || (Array.isArray(json.value) ? json.value.length : 1),
-      nextLink: json['odata.nextLink']
+      total: json['odata.count'] || json['@odata.count'] || (Array.isArray(json.value) ? json.value.length : 1),
+      nextLink: json['odata.nextLink'] || json['@odata.nextLink']
     };
   } catch (err: any) {
     return {
@@ -196,4 +196,86 @@ export async function querySapServiceLayer<T = any>(
       error: err.message || 'Error de conexión con SAP Service Layer'
     };
   }
+}
+
+/**
+ * Normalize SAP Service Layer odata.nextLink to a relative endpoint under basePath
+ */
+function normalizeNextLink(nextLink: string, basePath: string): string {
+  let clean = nextLink.trim();
+  if (/^https?:\/\//i.test(clean)) {
+    const parsed = new URL(clean);
+    clean = `${parsed.pathname}${parsed.search}`;
+  }
+  const normalizedBase = basePath.replace(/^\/|\/$/g, '');
+  clean = clean.replace(/^\/+/, '');
+  if (normalizedBase && clean.startsWith(`${normalizedBase}/`)) {
+    clean = clean.slice(normalizedBase.length + 1);
+  }
+  return clean;
+}
+
+/**
+ * Fetch ALL pages of a SAP Service Layer collection by following odata.nextLink
+ */
+export async function queryAllSapServiceLayer<T = any>(
+  endpoint: string,
+  options?: {
+    params?: Record<string, string>;
+    pageSize?: number;
+    maxPages?: number;
+  }
+): Promise<{ success: boolean; data?: T[]; total?: number; error?: string }> {
+  const pageSize = options?.pageSize || 200;
+  const maxPages = options?.maxPages || 50;
+  const { basePath } = parseUrl(SAP_BASE_URL);
+
+  const allItems: T[] = [];
+  let currentEndpoint = endpoint;
+  let currentParams = options?.params;
+  let pagesFetched = 0;
+
+  while (pagesFetched < maxPages) {
+    const res = await querySapServiceLayer<T[]>(currentEndpoint, {
+      params: currentParams,
+      pageSize
+    });
+
+    if (!res.success) {
+      if (pagesFetched === 0) {
+        return { success: false, error: res.error };
+      }
+      return {
+        success: false,
+        data: allItems,
+        total: allItems.length,
+        error: res.error
+      };
+    }
+
+    if (Array.isArray(res.data)) {
+      allItems.push(...res.data);
+    }
+
+    pagesFetched += 1;
+
+    if (!res.nextLink) {
+      break;
+    }
+
+    const nextEndpoint = normalizeNextLink(res.nextLink, basePath);
+    if (!nextEndpoint || nextEndpoint === currentEndpoint) {
+      break;
+    }
+
+    currentEndpoint = nextEndpoint;
+    // nextLink already includes query parameters ($orderby, $select, $skip, etc.)
+    currentParams = undefined;
+  }
+
+  return {
+    success: true,
+    data: allItems,
+    total: allItems.length
+  };
 }
